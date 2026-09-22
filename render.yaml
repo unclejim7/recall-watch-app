@@ -9,6 +9,10 @@ services:
     startCommand: npm start
     healthCheckPath: /api/health
     envVars:
+      # Pinned because better-sqlite3's native addon doesn't compile on
+      # Render's newest default runtime yet — see .node-version too.
+      - key: NODE_VERSION
+        value: "22"
       - key: NODE_ENV
         value: production
       - key: SESSION_SECRET
