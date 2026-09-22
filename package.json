@@ -1,0 +1,27 @@
+{
+  "name": "recall-watch-app",
+  "version": "1.0.0",
+  "description": "Alerts users when a product, vehicle, or food/drug item they own gets recalled.",
+  "main": "src/server.js",
+  "type": "commonjs",
+  "scripts": {
+    "start": "node src/server.js",
+    "dev": "node --watch src/server.js",
+    "check-now": "node -e \"require('./src/scheduler').runAllChecks().then(()=>process.exit(0))\"",
+    "test": "node --test \"test/**/*.test.js\""
+  },
+  "engines": {
+    "node": ">=18"
+  },
+  "dependencies": {
+    "bcryptjs": "^2.4.3",
+    "better-sqlite3": "^11.3.0",
+    "dotenv": "^16.4.5",
+    "express": "^4.21.0",
+    "express-rate-limit": "^8.7.0",
+    "express-session": "^1.18.0",
+    "helmet": "^8.3.0",
+    "node-cron": "^3.0.3",
+    "nodemailer": "^6.9.15"
+  }
+}
