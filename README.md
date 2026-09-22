@@ -95,17 +95,32 @@ CI (`.github/workflows/ci.yml`) runs this on every push and pull request.
 
 ## Deploying
 
+### Render (one click)
+
+[![Deploy to Render](https://render.com/images/deploy-to-render-button.svg)](https://render.com/deploy?repo=https://github.com/unclejim7/recall-watch-app)
+
+`render.yaml` defines the whole service — Node web service on the Starter plan
+(the cheapest tier with a persistent disk), a 1GB disk for `data.sqlite`
+mounted at `/var/data`, the health check, and a random `SESSION_SECRET`. Click
+the button, connect your GitHub account, and Render provisions it. After the
+first deploy, add your SMTP credentials (required for alerts to send) and
+optionally `TWILIO_*`/`VAPID_*` in the service's **Environment** tab — the
+Blueprint leaves those blank on purpose rather than asking you to type
+secrets into a form before it exists.
+
+### Anywhere else
+
 This is a single Node process + a SQLite file on disk, so it deploys cleanly to
-any host with a persistent disk — Railway, Render, Fly.io, or a small VPS all
-work well. Two things to set up:
+any host with a persistent disk — Railway, Fly.io, or a small VPS all work
+well too. Two things to set up:
 
 1. **Environment variables** — copy everything in `.env.example` into your
    host's environment/secrets panel. You need real SMTP credentials (SendGrid,
    Postmark, Mailgun, or even a Gmail app password) for alert emails to send.
    Set `NODE_ENV=production` so session cookies are marked `secure`.
 2. **Persistent disk** — make sure `data.sqlite` lives on a volume that survives
-   deploys/restarts, not the ephemeral container filesystem. Render and Railway
-   both offer a "volume" or "disk" you can mount at the project root for this.
+   deploys/restarts, not the ephemeral container filesystem. Railway and Fly.io
+   both offer a "volume" you can mount for this; point `DB_PATH` at a file inside it.
 
 A `Dockerfile` is included if you'd rather ship a container — it runs `npm ci`,
 copies the app, and starts it as a non-root user on `$PORT` (default 3000).
