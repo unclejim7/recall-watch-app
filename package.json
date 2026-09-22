@@ -8,7 +8,7 @@
     "start": "node src/server.js",
     "dev": "node --watch src/server.js",
     "check-now": "node -e \"require('./src/scheduler').runAllChecks().then(()=>process.exit(0))\"",
-    "test": "node --test \"test/**/*.test.js\""
+    "test": "node --test"
   },
   "engines": {
     "node": ">=18"
