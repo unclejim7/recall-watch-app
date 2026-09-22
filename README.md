@@ -99,14 +99,21 @@ CI (`.github/workflows/ci.yml`) runs this on every push and pull request.
 
 [![Deploy to Render](https://render.com/images/deploy-to-render-button.svg)](https://render.com/deploy?repo=https://github.com/unclejim7/recall-watch-app)
 
-`render.yaml` defines the whole service — Node web service on the Starter plan
-(the cheapest tier with a persistent disk), a 1GB disk for `data.sqlite`
-mounted at `/var/data`, the health check, and a random `SESSION_SECRET`. Click
-the button, connect your GitHub account, and Render provisions it. After the
-first deploy, add your SMTP credentials (required for alerts to send) and
+`render.yaml` defines the whole service — a Node web service on the **Free**
+plan (no card required), the health check, and a random `SESSION_SECRET`.
+Click the button, connect your GitHub account, and Render provisions it. After
+the first deploy, add your SMTP credentials (required for alerts to send) and
 optionally `TWILIO_*`/`VAPID_*` in the service's **Environment** tab — the
 Blueprint leaves those blank on purpose rather than asking you to type
 secrets into a form before it exists.
+
+**The tradeoff**: Render's free tier doesn't support persistent disks, so
+`data.sqlite` — accounts, watched items, everything — resets whenever the
+service redeploys or spins back up after 15 minutes idle. Fine for trying the
+app out; not fine for real signups. When you're ready to keep data for real,
+add a card and bump `plan: free` to `plan: starter` in `render.yaml` (cheapest
+tier with a disk), or add a `disk:` block back mounted at e.g. `/var/data`
+with `DB_PATH=/var/data/data.sqlite` set to match.
 
 ### Anywhere else
 

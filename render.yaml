@@ -2,23 +2,17 @@ services:
   - type: web
     name: recall-watch-app
     env: node
-    plan: starter # cheapest plan that supports a persistent disk; free tier can't mount one
+    plan: free # no card required — but no persistent disk either, see README "Deploying"
     region: oregon
     branch: main
     buildCommand: npm ci
     startCommand: npm start
     healthCheckPath: /api/health
-    disk:
-      name: data
-      mountPath: /var/data
-      sizeGB: 1
     envVars:
       - key: NODE_ENV
         value: production
       - key: SESSION_SECRET
         generateValue: true
-      - key: DB_PATH
-        value: /var/data/data.sqlite
       - key: CRON_SCHEDULE
         value: 0 */6 * * *
       # Required for alert emails to actually send — set these in the Render
