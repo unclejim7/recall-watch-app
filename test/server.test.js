@@ -147,3 +147,53 @@ test('logout clears the session', async () => {
   const res = await c('/api/items');
   assert.equal(res.status, 401);
 });
+
+test('PATCH /api/me requires auth', async () => {
+  const res = await fetch(baseUrl + '/api/me', { method: 'PATCH', body: JSON.stringify({ phone: '5551234567' }), headers: { 'Content-Type': 'application/json' } });
+  assert.equal(res.status, 401);
+});
+
+test('PATCH /api/me sets, normalizes, and clears a phone number', async () => {
+  const c = client();
+  await c('/api/signup', { method: 'POST', body: JSON.stringify({ email: 'phone@example.com', password: 'longenough1' }) });
+
+  const set = await c('/api/me', { method: 'PATCH', body: JSON.stringify({ phone: '(555) 123-4567' }) });
+  assert.equal(set.status, 200);
+  assert.equal(set.body.phone, '+15551234567');
+
+  const me = await c('/api/me');
+  assert.equal(me.body.user.phone, '+15551234567');
+
+  const cleared = await c('/api/me', { method: 'PATCH', body: JSON.stringify({ phone: '' }) });
+  assert.equal(cleared.status, 200);
+  assert.equal(cleared.body.phone, null);
+});
+
+test('PATCH /api/me rejects an invalid phone number', async () => {
+  const c = client();
+  await c('/api/signup', { method: 'POST', body: JSON.stringify({ email: 'badphone@example.com', password: 'longenough1' }) });
+  const res = await c('/api/me', { method: 'PATCH', body: JSON.stringify({ phone: 'not a phone' }) });
+  assert.equal(res.status, 400);
+});
+
+test('GET /api/push/vapid-public-key returns null when push is not configured', async () => {
+  const res = await fetch(baseUrl + '/api/push/vapid-public-key');
+  assert.equal(res.status, 200);
+  const body = await res.json();
+  assert.equal(body.key, null);
+});
+
+test('push subscribe/unsubscribe round-trip', async () => {
+  const c = client();
+  await c('/api/signup', { method: 'POST', body: JSON.stringify({ email: 'pushsub@example.com', password: 'longenough1' }) });
+
+  const badSub = await c('/api/push/subscribe', { method: 'POST', body: JSON.stringify({ subscription: { endpoint: 'https://push.example.com/x' } }) });
+  assert.equal(badSub.status, 400);
+
+  const subscription = { endpoint: 'https://push.example.com/server-test', keys: { p256dh: 'p', auth: 'a' } };
+  const sub = await c('/api/push/subscribe', { method: 'POST', body: JSON.stringify({ subscription }) });
+  assert.equal(sub.status, 200);
+
+  const unsub = await c('/api/push/unsubscribe', { method: 'POST', body: JSON.stringify({ endpoint: subscription.endpoint }) });
+  assert.equal(unsub.status, 200);
+});

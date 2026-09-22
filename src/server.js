@@ -7,6 +7,8 @@ const rateLimit = require('express-rate-limit');
 const bcrypt = require('bcryptjs');
 const { db } = require('./db');
 const scheduler = require('./scheduler');
+const push = require('./push');
+const { normalizePhone } = require('./phone');
 
 const isProd = process.env.NODE_ENV === 'production';
 
@@ -85,8 +87,46 @@ app.post('/api/logout', (req, res) => {
 
 app.get('/api/me', (req, res) => {
   if (!req.session.userId) return res.json({ user: null });
-  const user = db.prepare('SELECT email FROM users WHERE id = ?').get(req.session.userId);
+  const user = db.prepare('SELECT email, phone FROM users WHERE id = ?').get(req.session.userId);
   res.json({ user });
+});
+
+app.patch('/api/me', requireAuth, (req, res) => {
+  const { phone } = req.body || {};
+  if (phone === undefined) return res.status(400).json({ error: 'Nothing to update.' });
+
+  let normalized = null;
+  if (String(phone || '').trim() !== '') {
+    normalized = normalizePhone(phone);
+    if (!normalized) {
+      return res.status(400).json({ error: 'Enter a valid phone number, e.g. (555) 123-4567.' });
+    }
+  }
+  db.prepare('UPDATE users SET phone = ? WHERE id = ?').run(normalized, req.session.userId);
+  res.json({ ok: true, phone: normalized });
+});
+
+// ---- Push notifications ----
+
+app.get('/api/push/vapid-public-key', (req, res) => {
+  res.json({ key: process.env.VAPID_PUBLIC_KEY || null });
+});
+
+app.post('/api/push/subscribe', requireAuth, (req, res) => {
+  const { subscription } = req.body || {};
+  if (!subscription || !subscription.endpoint || !subscription.keys
+      || !subscription.keys.p256dh || !subscription.keys.auth) {
+    return res.status(400).json({ error: 'Invalid push subscription.' });
+  }
+  push.saveSubscription(req.session.userId, subscription);
+  res.json({ ok: true });
+});
+
+app.post('/api/push/unsubscribe', requireAuth, (req, res) => {
+  const { endpoint } = req.body || {};
+  if (!endpoint) return res.status(400).json({ error: 'Missing endpoint.' });
+  push.removeSubscription(req.session.userId, endpoint);
+  res.json({ ok: true });
 });
 
 // ---- Watched items ----

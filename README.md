@@ -1,8 +1,9 @@
 # Recall Watch
 
 Lets people watch specific items they own — a car seat, a car, a food product, a
-medication — and get emailed the moment a matching recall is published. Built on
-public government recall APIs, so there's no data-licensing cost.
+medication — and get alerted the instant a matching recall is published: by email
+always, and by text message or an instant phone push notification if they turn
+those on. Built on public government recall APIs, so there's no data-licensing cost.
 
 ## What it covers
 
@@ -24,6 +25,25 @@ public government recall APIs, so there's no data-licensing cost.
   is very different from the recall notice's, but it won't spam people with
   loosely-related recalls. `src/matcher.js` is the place to make this smarter
   (fuzzy matching, model-number extraction, etc.) as you learn from real usage.
+
+## Notifications
+
+Email is always on — it's tied to the account. Two extra channels layer on top,
+each opt-in and each best-effort (a failure in either never blocks the email):
+
+| Channel | How | Setup |
+|---|---|---|
+| Email | nodemailer/SMTP | Required — see `.env.example` |
+| Text message | Twilio SMS | Optional — set `TWILIO_*` in `.env`, user adds a phone number in their dashboard's Notifications section |
+| Push notification | Web Push (Push API + VAPID) | Optional — set `VAPID_*` in `.env` (generate a keypair with `npx web-push generate-vapid-keys`), user clicks "Enable push notifications" in their dashboard |
+
+Push works instantly on Android and desktop browsers with no app install. On
+iOS Safari, Apple requires the site to be added to the home screen first
+(Share → Add to Home Screen) before push permission can be granted — the
+dashboard shows that instruction automatically on unsupported browsers.
+
+Leaving `TWILIO_*` or `VAPID_*` unset simply disables that channel; the rest of
+the app works the same either way.
 
 ## Running it
 
@@ -69,6 +89,9 @@ CI (`.github/workflows/ci.yml`) runs this on every push and pull request.
 - Deploying behind a reverse proxy (Render, Railway, Fly.io, etc.)? The app
   already sets `trust proxy`, which those platforms need for secure cookies
   and rate limiting to see the real client IP.
+- Keep `VAPID_PRIVATE_KEY` and `TWILIO_AUTH_TOKEN` as secret as `SESSION_SECRET` —
+  the VAPID private key can forge push notifications to any subscribed browser,
+  and the Twilio auth token can send SMS (and cost money) on your account.
 
 ## Deploying
 
@@ -96,9 +119,6 @@ assumes a single process).
 
 ## Extending it
 
-- **SMS/push instead of email**: swap `src/mailer.js` for Twilio/OneSignal —
-  everything else stays the same, since `scheduler.js` just calls
-  `sendRecallAlert(item.email, item, recall)`.
 - **Barcode/VIN lookup on signup**: instead of asking people to type keywords,
   scan a UPC or VIN and pre-fill `criteria`. CPSC recalls don't include UPCs
   consistently, so keyword matching would still be the fallback.
@@ -110,10 +130,13 @@ assumes a single process).
 
 ```
 src/
-  server.js       Express app — auth, item CRUD, manual "check now"
+  server.js       Express app — auth, item CRUD, manual "check now", push/phone settings
   scheduler.js     Cron loop — fetches recalls per category, matches, emails, dedupes
   matcher.js       Keyword matching logic
   mailer.js        Email sending (nodemailer/SMTP)
+  sms.js           SMS alerts (Twilio, optional)
+  push.js          Web Push alerts (VAPID, optional)
+  phone.js         Phone number normalization (E.164)
   db.js            SQLite schema + connection
   sources/
     cpsc.js        CPSC consumer product recalls
@@ -122,7 +145,11 @@ src/
     usda.js        USDA FSIS meat/poultry/egg recalls
 public/
   index.html, app.js, styles.css   Single-page dashboard (no build step)
+  sw.js           Service worker — shows push notifications, handles taps
 test/
   matcher.test.js  Unit tests for keyword matching
+  phone.test.js    Unit tests for phone number normalization
+  sms.test.js      Unit tests for SMS message building
+  push.test.js     Unit + DB tests for push subscription storage
   server.test.js   End-to-end HTTP tests for the Express app
 ```

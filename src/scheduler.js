@@ -1,6 +1,8 @@
 const cron = require('node-cron');
 const { db, getSetting, setSetting } = require('./db');
 const { sendRecallAlert } = require('./mailer');
+const sms = require('./sms');
+const push = require('./push');
 const { matchByKeywords } = require('./matcher');
 const cpsc = require('./sources/cpsc');
 const nhtsa = require('./sources/nhtsa');
@@ -11,7 +13,7 @@ const LOOKBACK_DAYS_FIRST_RUN = 14; // how far back to look the very first time 
 
 function getItemsByCategory(category) {
   const rows = db.prepare(
-    `SELECT wi.id, wi.label, wi.criteria_json, u.email
+    `SELECT wi.id, wi.label, wi.criteria_json, u.id AS user_id, u.email, u.phone
      FROM watched_items wi JOIN users u ON u.id = wi.user_id
      WHERE wi.category = ?`
   ).all(category);
@@ -19,6 +21,8 @@ function getItemsByCategory(category) {
     id: r.id,
     label: r.label,
     email: r.email,
+    userId: r.user_id,
+    phone: r.phone,
     criteria: JSON.parse(r.criteria_json)
   }));
 }
@@ -59,6 +63,16 @@ async function processMatches(matches) {
       continue; // don't mark as sent if the email failed — retry next cycle
     }
     markSent(item.id, recall.source, recall.id);
+
+    // SMS and push are instant best-effort extras on top of the required email —
+    // neither blocks the dedup mark above, and a failure here just logs and moves on.
+    if (item.phone && sms.isConfigured()) {
+      sms.sendSmsAlert(item.phone, item, recall)
+        .then(() => console.log(`[sms sent] ${item.phone} <- ${recall.sourceLabel}: ${recall.title}`))
+        .catch((err) => console.error(`[sms FAILED] ${item.phone}:`, err.message));
+    }
+    push.sendPushToUser(item.userId, item, recall)
+      .catch((err) => console.error(`[push FAILED] user ${item.userId}:`, err.message));
   }
 }
 
